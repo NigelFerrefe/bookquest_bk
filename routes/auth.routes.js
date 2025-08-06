@@ -18,6 +18,7 @@ const saltRounds = 10;
 
 // POST /auth/signup  - Creates a new user in the database
 router.post("/signup", (req, res, next) => {
+  console.log("POST /auth/signup reached");
   const { email, password, name } = req.body;
 
   // Check if email or password or name are provided as empty strings
@@ -98,10 +99,10 @@ router.post("/login", (req, res, next) => {
 
       if (passwordCorrect) {
         // Deconstruct the user object to omit the password
-        const { _id, email, name } = foundUser;
+        const { _id, email, name, role } = foundUser;
 
         // Create an object that will be set as the token payload
-        const payload = { _id, email, name };
+        const payload = { _id, email, name, role };
 
         // Create a JSON Web Token and sign it
         const authToken = jwt.sign(payload, process.env.TOKEN_SECRET, {
@@ -118,6 +119,8 @@ router.post("/login", (req, res, next) => {
     .catch((err) => next(err)); // In this case, we send error handling to the error handling middleware.
 });
 
+
+
 // GET  /auth/verify  -  Used to verify JWT stored on the client
 router.get("/verify", isAuthenticated, (req, res, next) => {
   // If JWT token is valid the payload gets decoded by the
@@ -129,3 +132,4 @@ router.get("/verify", isAuthenticated, (req, res, next) => {
 });
 
 module.exports = router;
+
