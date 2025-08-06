@@ -111,5 +111,16 @@ router.get("/verify", isAuthenticated, (req, res, next) => {
   res.status(200).json(req.payload);
 });
 
+
+// POST /auth/logout - Logout user (dummy endpoint)
+router.post("/logout", isAuthenticated, (req, res) => {
+  // Opcional: aquí podrías manejar una blacklist de tokens si quisieras
+  // Por ahora sólo responde con éxito y el cliente debe eliminar el token localmente
+  res.status(200).json({ message: "User logged out successfully" });
+});
+
+
 module.exports = router;
+
+
 
