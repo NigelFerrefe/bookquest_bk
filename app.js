@@ -13,7 +13,7 @@ const indexRoutes = require("./routes/index.routes");
 const authRoutes = require("./routes/auth.routes");
 const userRoutes = require("./routes/user.routes");
 const genreRoutes = require("./routes/genre.routes");
-const bookRoutes = require("./routes/book.router");
+const bookRoutes = require("./routes/book.routes");
 const authorRoutes = require("./routes/author.routes");
 const app = express();
 

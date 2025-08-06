@@ -10,11 +10,11 @@ const bookSchema = new Schema({
     ref: "Author",
     required: [true, "Author is required."],
   },
-  genre: {
+  genre: [{
     type: Schema.Types.ObjectId,
     ref: "Genre",
     required: [true, "Genre is required."],
-  },
+  }],
   imageUrl: {
     type: String,
   },

@@ -1,5 +1,9 @@
 const express = require("express");
 const router = express.Router();
+const { z } = require("zod");
+const { userSchema } = require("../schemas/user.schema")
+
+
 
 // ℹ️ Handles password encryption
 const bcrypt = require("bcrypt");
@@ -17,62 +21,38 @@ const { isAuthenticated } = require("../middleware/jwt.middleware.js");
 const saltRounds = 10;
 
 // POST /auth/signup  - Creates a new user in the database
-router.post("/signup", (req, res, next) => {
-  console.log("POST /auth/signup reached");
-  const { email, password, name } = req.body;
+router.post("/signup", async (req, res, next) => {
+  try {
+    // Validar el body con Zod
+    const validatedData = userSchema.parse(req.body);
 
-  // Check if email or password or name are provided as empty strings
-  if (email === "" || password === "" || name === "") {
-    res.status(400).json({ message: "Provide email, password and name" });
-    return;
-  }
+    // Comprobar si el email ya existe
+    const foundUser = await User.findOne({ email: validatedData.email });
+    if (foundUser) {
+      return res.status(400).json({ message: "User already exists." });
+    }
 
-  // This regular expression check that the email is of a valid format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-  if (!emailRegex.test(email)) {
-    res.status(400).json({ message: "Provide a valid email address." });
-    return;
-  }
+    // Hashear la contraseña
+    const salt = bcrypt.genSaltSync(saltRounds);
+    const hashedPassword = bcrypt.hashSync(validatedData.password, salt);
 
-  // This regular expression checks password for special characters and minimum length
-  const passwordRegex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,}/;
-  if (!passwordRegex.test(password)) {
-    res.status(400).json({
-      message:
-        "Password must have at least 6 characters and contain at least one number, one lowercase and one uppercase letter.",
+    // Crear usuario con la contraseña ya hasheada
+    const createdUser = await User.create({
+      email: validatedData.email,
+      password: hashedPassword,
+      name: validatedData.name,
+      role: validatedData.role ?? 'user', // si quieres definir rol por defecto
     });
-    return;
+
+    // No devolver la contraseña
+    const { email, name, _id } = createdUser;
+    res.status(201).json({ user: { email, name, _id } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ errors: error.issues });
+    }
+    next(error);
   }
-
-  // Check the users collection if a user with the same email already exists
-  User.findOne({ email })
-    .then((foundUser) => {
-      // If the user with the same email already exists, send an error response
-      if (foundUser) {
-        res.status(400).json({ message: "User already exists." });
-        return;
-      }
-
-      // If email is unique, proceed to hash the password
-      const salt = bcrypt.genSaltSync(saltRounds);
-      const hashedPassword = bcrypt.hashSync(password, salt);
-
-      // Create the new user in the database
-      // We return a pending promise, which allows us to chain another `then`
-      return User.create({ email, password: hashedPassword, name });
-    })
-    .then((createdUser) => {
-      // Deconstruct the newly created user object to omit the password
-      // We should never expose passwords publicly
-      const { email, name, _id } = createdUser;
-
-      // Create a new object that doesn't expose the password
-      const user = { email, name, _id };
-
-      // Send a json response containing the user object
-      res.status(201).json({ user: user });
-    })
-    .catch((err) => next(err)); // In this case, we send error handling to the error handling middleware.
 });
 
 // POST  /auth/login - Verifies email and password and returns a JWT
