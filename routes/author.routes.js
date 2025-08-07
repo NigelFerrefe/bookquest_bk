@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const Author = require("../models/author.model");
+const Book = require("../models/books.model");
+
 const { z } = require("zod");
 const { authorSchema } = require("../Schemas/author.schema")
 
@@ -36,6 +38,18 @@ router.get("/", async (req, res) => {
         next(error);
     }
 });
+
+//Get all books from author
+router.get("/:id/books", async (req,res,next) => {
+  const authorId = req.params.id;
+  try {
+    const books = await Book.find({author: authorId}).populate("author", "name").populate("genre", "name");
+
+    res.status(200).json(books);
+  } catch (error) {
+    next(error);
+  }
+})
 
 
 //update an author

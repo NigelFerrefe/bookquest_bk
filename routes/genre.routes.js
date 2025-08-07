@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Genre = require("../models/genre.model");
+const Book = require("../models/books.model");
 const { z } = require("zod");
 const { genreSchema } = require("../Schemas/genre.schema")
 
@@ -37,6 +38,18 @@ router.get("/", async (req, res) => {
         next(error);
     }
 });
+
+//Get all books from genre
+router.get("/:id/books", async (req,res,next) => {
+  const genreId = req.params.id;
+  try {
+    const books = await Book.find({genre: genreId}).populate("author", "name").populate("genre", "name");
+
+    res.status(200).json(books);
+  } catch (error) {
+    next(error);
+  }
+})
 
 //Update a genre
 router.put("/:id", async(req, res, next) => {

@@ -5,7 +5,8 @@ const genreSchema = new Schema({
         type: String,
         required: [true, "Name is required."],
     },
-})
+});
+
 
 const Genre = model("Genre", genreSchema);
 

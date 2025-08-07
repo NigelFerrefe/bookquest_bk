@@ -13,20 +13,6 @@ REST API for managing books, authors, genres, and users, featuring JWT-based aut
 
 ---
 
-## Installation
-
-1. Clone the repository  
-2. Run `npm install` to install dependencies  
-3. Set environment variables in `.env`:  
-    - `MONGODB_URI`  
-    - `JWT_SECRET`  
-    - `CLOUDINARY_CLOUD_NAME`  
-    - `CLOUDINARY_API_KEY`  
-    - `CLOUDINARY_API_SECRET`  
-4. Run `npm start` to start the server
-
----
-
 ## Routes and Endpoints
 
 ### Auth (`/auth`)
@@ -67,6 +53,9 @@ REST API for managing books, authors, genres, and users, featuring JWT-based aut
 - **GET /author**  
   List all authors
 
+- **GET /author/:authorId/books**  
+  List all books from an author
+
 - **PUT /author/:authorId**  
   Update author  
   Header: `Authorization: Bearer <token>`  
@@ -87,6 +76,9 @@ REST API for managing books, authors, genres, and users, featuring JWT-based aut
 
 - **GET /genre**  
   List all genres
+
+- **GET /genre/:genreId/books**  
+  List all books from a genre
 
 - **PUT /genre/:genreId**  
   Update genre  
@@ -143,7 +135,7 @@ User book lists with pagination (10 items per page)
 
 ## Validation
 
-All inputs are validated with [Zod](https://github.com/colinhacks/zod), ensuring data integrity and type safety in the routes.
+All inputs are validated with [Zod], ensuring data integrity and type safety in the routes.
 
 ---
 
