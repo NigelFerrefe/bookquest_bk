@@ -1,17 +1,9 @@
-const express = require('express');
-const app = express();
+const app = require("./app");
 
-// Middleware (si tienes JSON o CORS)
-app.use(express.json());
-
-// Rutas de ejemplo
-app.get('/', (req, res) => {
-  res.send('¡Hola desde Render!');
-});
-
-// 🔴 IMPORTANTE: Render usa process.env.PORT
+// ℹ️ Sets the PORT for our app to have access to it. If no env has been set, we hard code it to 5005
 const PORT = process.env.PORT || 5005;
 
+
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
+  console.log(`Server listening on http://localhost:${PORT}`);
 });
