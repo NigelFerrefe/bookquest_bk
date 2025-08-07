@@ -4,7 +4,7 @@ const Author = require("../models/author.model");
 const Book = require("../models/books.model");
 
 const { z } = require("zod");
-const { authorSchema } = require("../Schemas/author.schema")
+const { authorSchema } = require("../schemas/author.schema")
 
 //Create a new author
 router.post("/", async (req, res) => {

@@ -3,7 +3,7 @@ const router = express.Router();
 const Genre = require("../models/genre.model");
 const Book = require("../models/books.model");
 const { z } = require("zod");
-const { genreSchema } = require("../Schemas/genre.schema")
+const { genreSchema } = require("../schemas/genre.schema")
 
 //Create a new genre
 router.post("/", async (req, res) => {

@@ -5,7 +5,7 @@ const Genre = require("../models/genre.model");
 const Author = require("../models/author.model");
 const upload = require("../config/cloudinary.config");
 const {buildPagination} = require("../utils/pagination")
-const { bookSchema } = require("../Schemas/book.schema");
+const { bookSchema } = require("../schemas/book.schema");
 const { z } = require("zod");
 
 //? Book lists
