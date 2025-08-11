@@ -47,9 +47,18 @@ router.post("/signup", async (req, res, next) => {
       role: validatedData.role ?? 'user', // si quieres definir rol por defecto
     });
 
-    // No devolver la contraseña
-    const { email, name, _id } = createdUser;
-    res.status(201).json({ user: { email, name, _id } });
+   // Crear payload para el JWT
+   const { _id, email, name, role } = createdUser;
+   const payload = { _id, email, name, role };
+
+   // Firmar el token
+   const authToken = jwt.sign(payload, process.env.TOKEN_SECRET, {
+     algorithm: "HS256",
+     expiresIn: "6h",
+   });
+
+   // Responder con el usuario y el token
+   res.status(201).json({ user: { email, name, _id }, authToken });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ errors: error.issues });
