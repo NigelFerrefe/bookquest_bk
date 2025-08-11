@@ -105,7 +105,7 @@ router.post("/login", (req, res, next) => {
         // Send the token as the response
         res.status(200).json({ authToken: authToken });
       } else {
-        res.status(401).json({ message: "Unable to authenticate the user" });
+        res.status(401).json({ message: "Password do not match our records" });
       }
     })
     .catch((err) => next(err)); // In this case, we send error handling to the error handling middleware.
