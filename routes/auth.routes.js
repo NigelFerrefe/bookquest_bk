@@ -29,8 +29,11 @@ router.post("/signup", async (req, res, next) => {
     // Comprobar si el email ya existe
     const foundUser = await User.findOne({ email: validatedData.email });
     if (foundUser) {
-      return res.status(400).json({ message: "User already exists." });
+      const error = new Error("User already exists.");
+      error.status = 400;
+      return next(error);
     }
+    
 
     // Hashear la contraseña
     const salt = bcrypt.genSaltSync(saltRounds);

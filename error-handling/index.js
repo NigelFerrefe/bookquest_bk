@@ -9,6 +9,11 @@ module.exports = (app) => {
     console.error("ERROR", req.method, req.path, err);
 
     if (!res.headersSent) {
+
+      if (err.status && err.message) {
+        return res.status(err.status).json({ message: err.message });
+      }
+
       // 401 - Token inválido o ausente (express-jwt)
       if (err.name === "UnauthorizedError") {
         return res.status(401).json({ message: "Invalid or missing token" });
