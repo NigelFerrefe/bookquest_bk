@@ -30,26 +30,80 @@ router.post("/", async (req, res) => {
   });
 
 //Get all authors
-router.get("/", async (req, res) => {
-    try {
-        const authors = await Author.find();
-        res.status(200).json(authors);
-    } catch (error) {
-        next(error);
-    }
-});
-
-//Get all books from author
-router.get("/:id/books", async (req,res,next) => {
-  const authorId = req.params.id;
+router.get("/", async (req, res, next) => {
   try {
-    const books = await Book.find({author: authorId}).populate("author", "name").populate("genre", "name");
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.per_page) || 10;
+    const search = req.query.search?.trim() || "";
 
-    res.status(200).json(books);
+    const query = {};
+
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    const total = await Author.countDocuments(query);
+
+    const authors = await Author.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage);
+
+    const pagination = buildPagination({
+      totalItems: total,
+      currentPage: page,
+      perPage,
+    });
+
+    res.status(200).json({
+      data: authors,
+      pagination,
+    });
   } catch (error) {
     next(error);
   }
-})
+});
+
+
+//Get all books from author
+router.get("/:id/books", async (req, res, next) => {
+  const authorId = req.params.id;
+
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.per_page) || 10;
+    const search = req.query.search?.trim() || "";
+
+    const query = { author: authorId };
+
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
+    const total = await Book.countDocuments(query);
+
+    const books = await Book.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .populate("author", "name")
+      .populate("genre", "name");
+
+    const pagination = buildPagination({
+      totalItems: total,
+      currentPage: page,
+      perPage,
+    });
+
+    res.status(200).json({
+      data: books,
+      pagination,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 
 
 //update an author

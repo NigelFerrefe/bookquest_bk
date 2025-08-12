@@ -4,7 +4,7 @@ const Book = require("../models/books.model");
 const Genre = require("../models/genre.model");
 const Author = require("../models/author.model");
 const upload = require("../config/cloudinary.config");
-const {buildPagination} = require("../utils/pagination")
+const { buildPagination } = require("../utils/pagination");
 const { bookSchema } = require("../schemas/book.schema");
 const { z } = require("zod");
 
@@ -18,7 +18,7 @@ router.get("/wishlist", async (req, res, next) => {
     //* Read page parameters
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
-    const search = (req.query.search)?.trim() || "";
+    const search = req.query.search?.trim() || "";
 
     const query = {
       owner: userId,
@@ -29,13 +29,11 @@ router.get("/wishlist", async (req, res, next) => {
       query.title = { $regex: search, $options: "i" };
     }
 
-
     //* Total books, so we know page limit
     const total = await Book.countDocuments(query);
 
-    
     const wishlistBooks = await Book.find(query)
-      .sort({createdAt: -1})
+      .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author genre");
@@ -47,7 +45,6 @@ router.get("/wishlist", async (req, res, next) => {
       perPage,
     });
 
-    
     res.status(200).json({
       data: wishlistBooks,
       pagination,
@@ -57,7 +54,6 @@ router.get("/wishlist", async (req, res, next) => {
   }
 });
 
-
 //* Get purchased books
 router.get("/purchased", async (req, res, next) => {
   try {
@@ -65,16 +61,20 @@ router.get("/purchased", async (req, res, next) => {
 
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
-
+    const search = req.query.search?.trim() || "";
+    
     const query = {
       owner: userId,
       isBought: true,
     };
-
+    
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
     const total = await Book.countDocuments(query);
 
     const purchasedBooks = await Book.find(query)
-      .sort({createdAt: -1})
+      .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author genre");
@@ -94,23 +94,27 @@ router.get("/purchased", async (req, res, next) => {
   }
 });
 
-//* Get favorite books 
+//* Get favorite books
 router.get("/favorites", async (req, res, next) => {
   try {
     const userId = req.payload._id;
 
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
-
+    const search = req.query.search?.trim() || "";
+    
     const query = {
       owner: userId,
       isFavorite: true,
     };
 
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
     const total = await Book.countDocuments(query);
 
     const favoriteBooks = await Book.find(query)
-      .sort({createdAt: -1})
+      .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author genre");
@@ -151,15 +155,14 @@ router.post("/", upload.single("imageUrl"), async (req, res, next) => {
     //* Object with zod validation
     const dataToValidate = {
       ...req.body,
-      genre: Array.isArray(genre) ? genre : [genre], 
+      genre: Array.isArray(genre) ? genre : [genre],
       price: req.body.price ? Number(req.body.price) : undefined,
-      isBought: req.body.isBought === "true",    
+      isBought: req.body.isBought === "true",
       isFavorite: req.body.isFavorite === "true",
       imageUrl: req.file ? req.file.path : undefined,
-      owner: req.payload._id,  
+      owner: req.payload._id,
     };
 
-    
     const validatedBook = bookSchema.parse(dataToValidate);
 
     const newBook = new Book(validatedBook);
@@ -174,25 +177,20 @@ router.post("/", upload.single("imageUrl"), async (req, res, next) => {
   }
 });
 
+//* Book details
+router.get("/:id", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const book = await Book.findById(id).populate("author genre");
 
-
-//* Book details 
-router.get("/:id" , async (req, res, next) => {
-    try {
-        const {id} = req.params;
-        const book = await Book.findById(id).populate("author genre")
-
-        if (!book) {
-            return res.status(404).json({message: "Book not found"})
-        }
-        res.json(book)
-
-    } catch (error) {
-        next(error)
+    if (!book) {
+      return res.status(404).json({ message: "Book not found" });
     }
-})
-
-
+    res.json(book);
+  } catch (error) {
+    next(error);
+  }
+});
 
 //* Modify a book
 router.put("/:id", upload.single("imageUrl"), async (req, res, next) => {
@@ -205,15 +203,8 @@ router.put("/:id", upload.single("imageUrl"), async (req, res, next) => {
     }
 
     // Normalizar y preparar datos para validación
-    let {
-      title,
-      author,
-      genre,
-      description,
-      price,
-      isBought,
-      isFavorite,
-    } = req.body;
+    let { title, author, genre, description, price, isBought, isFavorite } =
+      req.body;
 
     const genreArray = genre
       ? Array.isArray(genre)
@@ -251,7 +242,7 @@ router.put("/:id", upload.single("imageUrl"), async (req, res, next) => {
     const dataToUpdate = {
       title: title ?? book.title,
       author: author ?? (book.author ? book.author.toString() : undefined),
-      genre: genreArray.map(g => g.toString()),
+      genre: genreArray.map((g) => g.toString()),
       description: description ?? book.description,
       price,
       isBought,
@@ -259,7 +250,6 @@ router.put("/:id", upload.single("imageUrl"), async (req, res, next) => {
       imageUrl,
       owner: book.owner ? book.owner.toString() : undefined,
     };
-    
 
     // Validar con Zod
     bookSchema.parse(dataToUpdate);
@@ -279,19 +269,19 @@ router.put("/:id", upload.single("imageUrl"), async (req, res, next) => {
 
 //* Delete book
 router.delete("/:id", async (req, res, next) => {
-    try {
-      const { id } = req.params;
-  
-      const deletedBook = await Book.findByIdAndDelete(id);
-  
-      if (!deletedBook) {
-        return res.status(404).json({ message: "Book not found" });
-      }
-  
-      res.json({ message: "Book deleted successfully", book: deletedBook });
-    } catch (error) {
-      next(error);
+  try {
+    const { id } = req.params;
+
+    const deletedBook = await Book.findByIdAndDelete(id);
+
+    if (!deletedBook) {
+      return res.status(404).json({ message: "Book not found" });
     }
-  });
+
+    res.json({ message: "Book deleted successfully", book: deletedBook });
+  } catch (error) {
+    next(error);
+  }
+});
 
 module.exports = router;
