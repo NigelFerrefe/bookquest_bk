@@ -30,78 +30,26 @@ router.post("/", async (req, res) => {
   });
 
 //Get all authors
-router.get("/", async (req, res, next) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const perPage = parseInt(req.query.per_page) || 10;
-    const search = req.query.search?.trim() || "";
-
-    const query = {};
-
-    if (search) {
-      query.name = { $regex: search, $options: "i" };
+router.get("/", async (req, res) => {
+    try {
+        const authors = await Author.find();
+        res.status(200).json(authors);
+    } catch (error) {
+        next(error);
     }
-
-    const total = await Author.countDocuments(query);
-
-    const authors = await Author.find(query)
-      .skip((page - 1) * perPage)
-      .limit(perPage);
-
-    const pagination = buildPagination({
-      totalItems: total,
-      currentPage: page,
-      perPage,
-    });
-
-    res.status(200).json({
-      data: authors,
-      pagination,
-    });
-  } catch (error) {
-    next(error);
-  }
 });
-
 
 //Get all books from author
-router.get("/:id/books", async (req, res, next) => {
+router.get("/:id/books", async (req,res,next) => {
   const authorId = req.params.id;
-
   try {
-    const page = parseInt(req.query.page) || 1;
-    const perPage = parseInt(req.query.per_page) || 10;
-    const search = req.query.search?.trim() || "";
+    const books = await Book.find({author: authorId}).populate("author", "name").populate("genre", "name");
 
-    const query = { author: authorId };
-
-    if (search) {
-      query.title = { $regex: search, $options: "i" };
-    }
-
-    const total = await Book.countDocuments(query);
-
-    const books = await Book.find(query)
-      .skip((page - 1) * perPage)
-      .limit(perPage)
-      .populate("author", "name")
-      .populate("genre", "name");
-
-    const pagination = buildPagination({
-      totalItems: total,
-      currentPage: page,
-      perPage,
-    });
-
-    res.status(200).json({
-      data: books,
-      pagination,
-    });
+    res.status(200).json(books);
   } catch (error) {
     next(error);
   }
-});
-
+})
 
 
 //update an author
