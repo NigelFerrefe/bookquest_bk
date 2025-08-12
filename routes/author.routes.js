@@ -45,7 +45,6 @@ router.get("/", async (req, res, next) => {
     const total = await Author.countDocuments(query);
 
     const authors = await Author.find(query)
-      .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage);
 
@@ -83,7 +82,6 @@ router.get("/:id/books", async (req, res, next) => {
     const total = await Book.countDocuments(query);
 
     const books = await Book.find(query)
-      .sort({ createdAt: -1 })
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author", "name")
