@@ -1,11 +1,16 @@
 const { Schema, model } = require("mongoose");
 
-const authorSchema = new Schema({
+const authorSchema = new Schema(
+  {
     name: {
-        type: String,
-        required: [true, "Name is required."],
+      type: String,
+      required: [true, "Name is required."],
     },
-})
+  },
+  {
+    timestamps: true,
+  }
+);
 
 const Author = model("Author", authorSchema);
 
