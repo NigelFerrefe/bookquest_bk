@@ -29,7 +29,7 @@ router.get("/wishlist", async (req, res, next) => {
 
     
     const wishlistBooks = await Book.find(query)
-      .sort({createAt: -1})
+      .sort({createdAt: -1})
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author genre");
@@ -68,7 +68,7 @@ router.get("/purchased", async (req, res, next) => {
     const total = await Book.countDocuments(query);
 
     const purchasedBooks = await Book.find(query)
-      .sort({createAt: -1})
+      .sort({createdAt: -1})
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author genre");
@@ -104,7 +104,7 @@ router.get("/favorites", async (req, res, next) => {
     const total = await Book.countDocuments(query);
 
     const favoriteBooks = await Book.find(query)
-      .sort({createAt: -1})
+      .sort({createdAt: -1})
       .skip((page - 1) * perPage)
       .limit(perPage)
       .populate("author genre");
