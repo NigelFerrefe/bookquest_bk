@@ -18,11 +18,17 @@ router.get("/wishlist", async (req, res, next) => {
     //* Read page parameters
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
+    const search = (req.query.search)?.trim() || "";
 
     const query = {
       owner: userId,
       isBought: false,
     };
+
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
 
     //* Total books, so we know page limit
     const total = await Book.countDocuments(query);
