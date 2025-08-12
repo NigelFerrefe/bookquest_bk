@@ -34,10 +34,17 @@ router.get("/", async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
+    const search = req.query.search?.trim() || "";
 
-    const total = await Author.countDocuments();
+    const query = {};
 
-    const authors = await Author.find()
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    const total = await Author.countDocuments(query);
+
+    const authors = await Author.find(query)
       .skip((page - 1) * perPage)
       .limit(perPage);
 
