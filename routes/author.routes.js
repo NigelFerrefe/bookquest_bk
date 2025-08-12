@@ -64,15 +64,36 @@ router.get("/", async (req, res, next) => {
 router.get("/:id/books", async (req, res, next) => {
   const authorId = req.params.id;
   try {
-    const books = await Book.find({ author: authorId })
-      .populate("author", "name")
-      .populate("genre", "name");
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.per_page) || 10;
+    const search = req.query.search?.trim() || "";
 
-    res.status(200).json(books);
+    const query = { author: authorId };
+
+    if (search) {
+      query.title = { $regex: search, $options: "i" };
+    }
+
+    const total = await Book.countDocuments(query);
+
+    const books = await Book.find(query)
+      .populate("author", "name")
+      .populate("genre", "name")
+      .skip((page - 1) * perPage)
+      .limit(perPage);
+
+    const pagination = buildPagination({
+      totalItems: total,
+      currentPage: page,
+      perPage,
+    });
+
+    res.status(200).json({ data: books, pagination });
   } catch (error) {
     next(error);
   }
 });
+
 
 //update an author
 router.put("/:id", async (req, res, next) => {
