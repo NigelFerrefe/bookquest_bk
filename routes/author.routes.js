@@ -141,7 +141,7 @@ router.delete("/:id", async (req, res, next) => {
 
     res
       .status(200)
-      .json({ message: "Author deleted successfully", genre: deletedAuthor });
+      .json({ message: "Author deleted successfully", author: deletedAuthor });
   } catch (error) {
     next(error);
   }
