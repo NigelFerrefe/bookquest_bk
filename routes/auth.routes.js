@@ -51,10 +51,9 @@ router.post("/signup", async (req, res, next) => {
    const { _id, email, name, role } = createdUser;
    const payload = { _id, email, name, role };
 
-   // Firmar el token
+   // Firmar el token, no expira, sino le ponemos esto: expiresIn: "6h",
    const authToken = jwt.sign(payload, process.env.TOKEN_SECRET, {
      algorithm: "HS256",
-     expiresIn: "6h",
    });
 
    // Responder con el usuario y el token
