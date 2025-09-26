@@ -66,12 +66,14 @@ router.get("/", async (req, res, next) => {
 //Get all books from genre
 router.get("/:id/books", async (req, res, next) => {
   const genreId = req.params.id;
+  const userId = req.payload._id;
+
   try {
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
     const search = req.query.search?.trim() || "";
 
-    const query = { genre: genreId };
+    const query = { genre: genreId, owner: userId };
     if (search) {
       query.title = { $regex: search, $options: "i" };
     }
