@@ -15,8 +15,11 @@ router.post("/", async (req, res) => {
     if (existingAuthor) {
       return res.status(409).json({ message: "This author already exists" });
     }
-
-    const newAuthor = new Author({ name });
+    const userId = req.payload._id;
+    const newAuthor = new Author({
+      name,
+      owner: userId,
+    });
     await newAuthor.save();
 
     res.status(201).json(newAuthor);
@@ -94,7 +97,6 @@ router.get("/:id/books", async (req, res, next) => {
     next(error);
   }
 });
-
 
 //update an author
 router.put("/:id", async (req, res, next) => {

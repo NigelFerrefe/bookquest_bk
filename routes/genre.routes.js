@@ -18,8 +18,9 @@ router.post("/", async (req, res) => {
     if (existingGenre) {
       return res.status(409).json({ message: "This genre already exists" });
     }
+    const userId = req.payload._id;
 
-    const newGenre = new Genre({ name });
+    const newGenre = new Genre({ name, owner: userId });
     await newGenre.save();
 
     res.status(201).json(newGenre);
