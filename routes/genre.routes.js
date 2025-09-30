@@ -39,8 +39,8 @@ router.get("/", async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const perPage = parseInt(req.query.per_page) || 10;
     const search = req.query.search?.trim() || "";
-
-    const query = {};
+    const userId = req.payload._id
+    const query = { owner: userId};
 
     if (search) {
       query.name = { $regex: search, $options: "i" };
