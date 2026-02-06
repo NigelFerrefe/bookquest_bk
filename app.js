@@ -15,6 +15,7 @@ const userRoutes = require("./routes/user.routes");
 const genreRoutes = require("./routes/genre.routes");
 const bookRoutes = require("./routes/book.routes");
 const authorRoutes = require("./routes/author.routes");
+const googleBooksRoutes = require("./routes/googleBooks.route");
 const app = express();
 
 app.use(express.json()); // para poder recibir JSON en el body
@@ -38,6 +39,7 @@ app.use("/api/author", isAuthenticated, authorRoutes);
 app.use("/api/book/wishlist", isAuthenticated, bookRoutes);
 app.use("/api/book/purchased", isAuthenticated, bookRoutes);
 app.use("/api/book/favorites", isAuthenticated, bookRoutes);
+app.use("/api/google-books", isAuthenticated, googleBooksRoutes);
 // Manejo de errores y rutas no encontradas
 require("./error-handling")(app);
 
