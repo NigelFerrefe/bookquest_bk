@@ -56,7 +56,7 @@ router.get("/", async (req, res, next) => {
 
     const baseUrl = "https://www.googleapis.com/books/v1/volumes";
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-
+console.log("🔍 Search query:", q);
     // Make two separate searches: one for Spanish and one for Catalan
     const searchPromises = ["es", "ca"].map(async (lang) => {
       const params = new URLSearchParams({
@@ -66,7 +66,8 @@ router.get("/", async (req, res, next) => {
         printType: "books",
         ...(apiKey && { key: apiKey })
       });
-
+const googleUrl = `${baseUrl}?${params.toString()}`;
+      console.log(`🌐 Calling Google Books (${lang}):`, googleUrl);
       try {
         const response = await fetchWithRetry(`${baseUrl}?${params.toString()}`);
         
@@ -78,6 +79,7 @@ router.get("/", async (req, res, next) => {
         }
         
         const data = await response.json();
+         console.log(`📚 Google returned for ${lang}:`, data.totalItems || 0, "items");
         return data;
       } catch (error) {
         console.error(`Search error for language ${lang}:`, error.message);
@@ -89,7 +91,7 @@ router.get("/", async (req, res, next) => {
 
     // Combine results from both searches
     const allItems = results.flatMap((result) => result.items || []);
-
+console.log(`📦 Total items before filtering:`, allItems.length);
     // Remove duplicates by ID
     const uniqueItems = Array.from(
       new Map(allItems.map((item) => [item.id, item])).values(),
@@ -130,7 +132,7 @@ router.get("/", async (req, res, next) => {
 
       return true;
     });
-
+console.log(`✅ Items after ISBN filter:`, filteredBooks.length);
     // Calculate pagination
     const totalItems = filteredBooks.length;
     const totalPages = Math.ceil(totalItems / limitNum);
