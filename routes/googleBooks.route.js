@@ -62,6 +62,7 @@ console.log("🔍 Search query:", q);
       const params = new URLSearchParams({
         q: q.trim(),
         langRestrict: lang,
+        country: "ES", // Force results from Spain
         maxResults: 40,
         printType: "books",
         ...(apiKey && { key: apiKey })
@@ -96,6 +97,16 @@ console.log(`📦 Total items before filtering:`, allItems.length);
     const uniqueItems = Array.from(
       new Map(allItems.map((item) => [item.id, item])).values(),
     );
+
+    // Log ISBNs for debugging
+    console.log(`📋 Sample ISBNs from results:`, uniqueItems.slice(0, 5).map(item => {
+      const isbn13 = item.volumeInfo?.industryIdentifiers?.find(id => id.type === "ISBN_13");
+      return {
+        title: item.volumeInfo?.title?.substring(0, 30),
+        isbn: isbn13?.identifier || 'NO ISBN',
+        lang: item.volumeInfo?.language
+      };
+    }));
 
     // Apply ISBN and language filters
     const filteredBooks = uniqueItems.filter((item) => {
