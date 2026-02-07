@@ -56,50 +56,39 @@ router.get("/", async (req, res, next) => {
 
     const baseUrl = "https://www.googleapis.com/books/v1/volumes";
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-console.log("🔍 Search query:", q);
-    // Make two separate searches: one for Spanish and one for Catalan
-    const searchPromises = ["es", "ca"].map(async (lang) => {
-      const params = new URLSearchParams({
-        q: q.trim(),
-        langRestrict: lang,
-        country: "ES", // Force results from Spain
-        maxResults: 40,
-        printType: "books",
-        ...(apiKey && { key: apiKey })
-      });
-const googleUrl = `${baseUrl}?${params.toString()}`;
-      console.log(`🌐 Calling Google Books (${lang}):`, googleUrl);
-      try {
-        const response = await fetchWithRetry(`${baseUrl}?${params.toString()}`);
-        
-        if (!response.ok) {
-          console.warn(
-            `Search error for language ${lang}: ${response.status} ${response.statusText}`,
-          );
-          return { items: [] };
-        }
-        
-        const data = await response.json();
-         console.log(`📚 Google returned for ${lang}:`, data.totalItems || 0, "items");
-        return data;
-      } catch (error) {
-        console.error(`Search error for language ${lang}:`, error.message);
-        return { items: [] };
-      }
+    console.log("🔍 Search query:", q);
+    
+    // Make a single search without langRestrict to get better regional results
+    const params = new URLSearchParams({
+      q: q.trim(),
+      maxResults: 40, // Maximum allowed by Google Books API
+      printType: "books",
+      orderBy: "relevance",
+      ...(apiKey && { key: apiKey })
     });
 
-    const results = await Promise.all(searchPromises);
+    const googleUrl = `${baseUrl}?${params.toString()}`;
+    console.log(`🌐 Calling Google Books:`, googleUrl);
+    
+    let allItems = [];
+    try {
+      const response = await fetchWithRetry(googleUrl);
+      
+      if (!response.ok) {
+        console.warn(`Search error: ${response.status} ${response.statusText}`);
+      } else {
+        const data = await response.json();
+        console.log(`📚 Google returned:`, data.totalItems || 0, "total items");
+        allItems = data.items || [];
+      }
+    } catch (error) {
+      console.error(`Search error:`, error.message);
+    }
 
-    // Combine results from both searches
-    const allItems = results.flatMap((result) => result.items || []);
-console.log(`📦 Total items before filtering:`, allItems.length);
-    // Remove duplicates by ID
-    const uniqueItems = Array.from(
-      new Map(allItems.map((item) => [item.id, item])).values(),
-    );
+    console.log(`📦 Total items fetched:`, allItems.length);
 
     // Log ISBNs for debugging
-    console.log(`📋 Sample ISBNs from results:`, uniqueItems.slice(0, 5).map(item => {
+    console.log(`📋 Sample ISBNs from results:`, allItems.slice(0, 5).map(item => {
       const isbn13 = item.volumeInfo?.industryIdentifiers?.find(id => id.type === "ISBN_13");
       return {
         title: item.volumeInfo?.title?.substring(0, 30),
@@ -109,7 +98,7 @@ console.log(`📦 Total items before filtering:`, allItems.length);
     }));
 
     // Apply ISBN and language filters
-    const filteredBooks = uniqueItems.filter((item) => {
+    const filteredBooks = allItems.filter((item) => {
       const volumeInfo = item.volumeInfo;
 
       // Verify it has industryIdentifiers
