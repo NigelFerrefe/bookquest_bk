@@ -61,7 +61,7 @@ router.get("/", async (req, res, next) => {
     // Make multiple searches with pagination to get more results
     // This helps overcome geolocation issues with Google Books API
     const maxResults = 40; // Maximum per request
-    const numberOfRequests = 4; // Get up to 160 items total
+    const numberOfRequests = 10; // Get up to 400 items total (optimized for personal use)
     
     const searchPromises = Array.from({ length: numberOfRequests }, (_, index) => {
       const params = new URLSearchParams({
