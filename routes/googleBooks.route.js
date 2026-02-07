@@ -11,6 +11,42 @@ const {
 } = require("../schemas/google-books.schema");
 const { bookSchema } = require("../schemas/book.schema");
 
+// Helper function to fetch with timeout and retry
+async function fetchWithRetry(url, options = {}, maxRetries = 2) {
+  let lastError;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 segundos
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+          ...options.headers,
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+      
+    } catch (error) {
+      lastError = error;
+      console.warn(`Attempt ${attempt + 1} failed:`, error.message);
+      
+      if (attempt < maxRetries) {
+        // Wait before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 // GET /api/google-books?q=consulta&page=1&limit=10
 router.get("/", async (req, res, next) => {
   try {
@@ -19,6 +55,7 @@ router.get("/", async (req, res, next) => {
     const { q, page: pageNum, limit: limitNum } = validatedParams;
 
     const baseUrl = "https://www.googleapis.com/books/v1/volumes";
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
 
     // Make two separate searches: one for Spanish and one for Catalan
     const searchPromises = ["es", "ca"].map(async (lang) => {
@@ -27,20 +64,23 @@ router.get("/", async (req, res, next) => {
         langRestrict: lang,
         maxResults: 40,
         printType: "books",
+        ...(apiKey && { key: apiKey })
       });
 
       try {
-        const response = await fetch(`${baseUrl}?${params.toString()}`);
+        const response = await fetchWithRetry(`${baseUrl}?${params.toString()}`);
+        
         if (!response.ok) {
           console.warn(
-            `Search error for language ${lang}: ${response.statusText}`,
+            `Search error for language ${lang}: ${response.status} ${response.statusText}`,
           );
           return { items: [] };
         }
+        
         const data = await response.json();
         return data;
       } catch (error) {
-        console.warn(`Search error for language ${lang}:`, error);
+        console.error(`Search error for language ${lang}:`, error.message);
         return { items: [] };
       }
     });
@@ -209,10 +249,17 @@ router.get("/:isbn13", async (req, res, next) => {
     // Clean ISBN for search (without hyphens)
     const cleanISBN = isbn13.replace(/-/g, "");
 
-    // Search Google Books by ISBN
-    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanISBN}`;
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const params = new URLSearchParams({
+      q: `isbn:${cleanISBN}`,
+      ...(apiKey && { key: apiKey })
+    });
 
-    const response = await fetch(url);
+    // Search Google Books by ISBN
+    const url = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
+
+    const response = await fetchWithRetry(url);
+    
     if (!response.ok) {
       return res.status(502).json({
         error: "External server error",
@@ -310,9 +357,12 @@ router.get("/:isbn13", async (req, res, next) => {
   } catch (error) {
     // Zod validation error
     if (error.name === "ZodError") {
+      const firstError = error.errors[0];
+      
       return res.status(400).json({
         error: "Validation error",
-        message: "The provided data is not valid",
+        message: firstError.message,
+        field: firstError.path.join("."),
         details: error.errors,
       });
     }
@@ -334,9 +384,15 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     // Clean ISBN for search
     const cleanISBN = isbn13.replace(/-/g, "");
 
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+    const params = new URLSearchParams({
+      q: `isbn:${cleanISBN}`,
+      ...(apiKey && { key: apiKey })
+    });
+
     // Search book in Google Books
-    const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanISBN}`;
-    const response = await fetch(url);
+    const url = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
+    const response = await fetchWithRetry(url);
     
     if (!response.ok) {
       return res.status(502).json({ 
@@ -402,7 +458,6 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
       return res.status(409).json({
         error: "Duplicate book",
         message: "This book is already in your wishlist",
-        
       });
     }
 
@@ -503,6 +558,5 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     next(error);
   }
 });
-
 
 module.exports = router;
