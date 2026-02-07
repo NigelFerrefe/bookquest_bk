@@ -58,34 +58,44 @@ router.get("/", async (req, res, next) => {
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
     console.log("🔍 Search query:", q);
     
-    // Make a single search without langRestrict to get better regional results
-    const params = new URLSearchParams({
-      q: q.trim(),
-      maxResults: 40, // Maximum allowed by Google Books API
-      printType: "books",
-      orderBy: "relevance",
-      ...(apiKey && { key: apiKey })
+    // Make multiple searches with pagination to get more results
+    // This helps overcome geolocation issues with Google Books API
+    const maxResults = 40; // Maximum per request
+    const numberOfRequests = 4; // Get up to 160 items total
+    
+    const searchPromises = Array.from({ length: numberOfRequests }, (_, index) => {
+      const params = new URLSearchParams({
+        q: q.trim(),
+        startIndex: index * maxResults,
+        maxResults: maxResults,
+        printType: "books",
+        orderBy: "relevance",
+        ...(apiKey && { key: apiKey })
+      });
+
+      const googleUrl = `${baseUrl}?${params.toString()}`;
+      if (index === 0) {
+        console.log(`🌐 Calling Google Books (batch ${index + 1}/${numberOfRequests}):`, googleUrl);
+      }
+      
+      return fetchWithRetry(googleUrl)
+        .then(response => {
+          if (!response.ok) {
+            console.warn(`Search error (batch ${index + 1}): ${response.status}`);
+            return { items: [] };
+          }
+          return response.json();
+        })
+        .catch(error => {
+          console.error(`Search error (batch ${index + 1}):`, error.message);
+          return { items: [] };
+        });
     });
 
-    const googleUrl = `${baseUrl}?${params.toString()}`;
-    console.log(`🌐 Calling Google Books:`, googleUrl);
+    const results = await Promise.all(searchPromises);
+    const allItems = results.flatMap(result => result.items || []);
     
-    let allItems = [];
-    try {
-      const response = await fetchWithRetry(googleUrl);
-      
-      if (!response.ok) {
-        console.warn(`Search error: ${response.status} ${response.statusText}`);
-      } else {
-        const data = await response.json();
-        console.log(`📚 Google returned:`, data.totalItems || 0, "total items");
-        allItems = data.items || [];
-      }
-    } catch (error) {
-      console.error(`Search error:`, error.message);
-    }
-
-    console.log(`📦 Total items fetched:`, allItems.length);
+    console.log(`📚 Total items fetched from ${numberOfRequests} requests:`, allItems.length);
 
     // Log ISBNs for debugging
     console.log(`📋 Sample ISBNs from results:`, allItems.slice(0, 5).map(item => {
