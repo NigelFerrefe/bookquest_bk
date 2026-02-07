@@ -14,36 +14,37 @@ const { bookSchema } = require("../schemas/book.schema");
 // Helper function to fetch with timeout and retry
 async function fetchWithRetry(url, options = {}, maxRetries = 2) {
   let lastError;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 segundos
-      
+
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0',
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0",
           ...options.headers,
-        }
+        },
       });
-      
+
       clearTimeout(timeoutId);
       return response;
-      
     } catch (error) {
       lastError = error;
       console.warn(`Attempt ${attempt + 1} failed:`, error.message);
-      
+
       if (attempt < maxRetries) {
         // Wait before retrying (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * (attempt + 1)),
+        );
       }
     }
   }
-  
+
   throw lastError;
 }
 
@@ -56,56 +57,45 @@ router.get("/", async (req, res, next) => {
 
     const baseUrl = "https://www.googleapis.com/books/v1/volumes";
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-    console.log("🔍 Search query:", q);
-    
+
     // Make multiple searches with pagination to get more results
     // This helps overcome geolocation issues with Google Books API
     const maxResults = 40; // Maximum per request
     const numberOfRequests = 10; // Get up to 400 items total (optimized for personal use)
-    
-    const searchPromises = Array.from({ length: numberOfRequests }, (_, index) => {
-      const params = new URLSearchParams({
-        q: q.trim(),
-        startIndex: index * maxResults,
-        maxResults: maxResults,
-        printType: "books",
-        orderBy: "relevance",
-        ...(apiKey && { key: apiKey })
-      });
 
-      const googleUrl = `${baseUrl}?${params.toString()}`;
-      if (index === 0) {
-        console.log(`🌐 Calling Google Books (batch ${index + 1}/${numberOfRequests}):`, googleUrl);
-      }
-      
-      return fetchWithRetry(googleUrl)
-        .then(response => {
-          if (!response.ok) {
-            console.warn(`Search error (batch ${index + 1}): ${response.status}`);
-            return { items: [] };
-          }
-          return response.json();
-        })
-        .catch(error => {
-          console.error(`Search error (batch ${index + 1}):`, error.message);
-          return { items: [] };
+    const searchPromises = Array.from(
+      { length: numberOfRequests },
+      (_, index) => {
+        const params = new URLSearchParams({
+          q: q.trim(),
+          startIndex: index * maxResults,
+          maxResults: maxResults,
+          printType: "books",
+          orderBy: "relevance",
+          ...(apiKey && { key: apiKey }),
         });
-    });
+
+        const googleUrl = `${baseUrl}?${params.toString()}`;
+
+        return fetchWithRetry(googleUrl)
+          .then((response) => {
+            if (!response.ok) {
+              console.warn(
+                `Search error (batch ${index + 1}): ${response.status}`,
+              );
+              return { items: [] };
+            }
+            return response.json();
+          })
+          .catch((error) => {
+            console.error(`Search error (batch ${index + 1}):`, error.message);
+            return { items: [] };
+          });
+      },
+    );
 
     const results = await Promise.all(searchPromises);
-    const allItems = results.flatMap(result => result.items || []);
-    
-    console.log(`📚 Total items fetched from ${numberOfRequests} requests:`, allItems.length);
-
-    // Log ISBNs for debugging
-    console.log(`📋 Sample ISBNs from results:`, allItems.slice(0, 5).map(item => {
-      const isbn13 = item.volumeInfo?.industryIdentifiers?.find(id => id.type === "ISBN_13");
-      return {
-        title: item.volumeInfo?.title?.substring(0, 30),
-        isbn: isbn13?.identifier || 'NO ISBN',
-        lang: item.volumeInfo?.language
-      };
-    }));
+    const allItems = results.flatMap((result) => result.items || []);
 
     // Apply ISBN and language filters
     const filteredBooks = allItems.filter((item) => {
@@ -142,7 +132,6 @@ router.get("/", async (req, res, next) => {
 
       return true;
     });
-console.log(`✅ Items after ISBN filter:`, filteredBooks.length);
     // Calculate pagination
     const totalItems = filteredBooks.length;
     const totalPages = Math.ceil(totalItems / limitNum);
@@ -264,14 +253,14 @@ router.get("/:isbn13", async (req, res, next) => {
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
     const params = new URLSearchParams({
       q: `isbn:${cleanISBN}`,
-      ...(apiKey && { key: apiKey })
+      ...(apiKey && { key: apiKey }),
     });
 
     // Search Google Books by ISBN
     const url = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
 
     const response = await fetchWithRetry(url);
-    
+
     if (!response.ok) {
       return res.status(502).json({
         error: "External server error",
@@ -370,7 +359,7 @@ router.get("/:isbn13", async (req, res, next) => {
     // Zod validation error
     if (error.name === "ZodError") {
       const firstError = error.errors[0];
-      
+
       return res.status(400).json({
         error: "Validation error",
         message: firstError.message,
@@ -399,26 +388,26 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
     const params = new URLSearchParams({
       q: `isbn:${cleanISBN}`,
-      ...(apiKey && { key: apiKey })
+      ...(apiKey && { key: apiKey }),
     });
 
     // Search book in Google Books
     const url = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
     const response = await fetchWithRetry(url);
-    
+
     if (!response.ok) {
-      return res.status(502).json({ 
+      return res.status(502).json({
         error: "External server error",
-        message: "Could not get data from Google Books API" 
+        message: "Could not get data from Google Books API",
       });
     }
 
     const data = await response.json();
 
     if (!data.items || data.items.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: "Book not found",
-        message: `No book found with ISBN ${isbn13}` 
+        message: `No book found with ISBN ${isbn13}`,
       });
     }
 
@@ -427,43 +416,46 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
 
     // Validate it has necessary data
     if (!volumeInfo.industryIdentifiers) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: "Incomplete data",
-        message: "The book does not have a registered ISBN" 
+        message: "The book does not have a registered ISBN",
       });
     }
 
-    const isbnObj = volumeInfo.industryIdentifiers.find(id => id.type === "ISBN_13");
+    const isbnObj = volumeInfo.industryIdentifiers.find(
+      (id) => id.type === "ISBN_13",
+    );
     if (!isbnObj) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: "ISBN not found",
-        message: "The book does not have ISBN-13 registered" 
+        message: "The book does not have ISBN-13 registered",
       });
     }
 
     // Verify it's a Spanish ISBN
     const foundISBN = isbnObj.identifier.replace(/-/g, "");
-    const isSpanishISBN = foundISBN.startsWith("97884") || foundISBN.startsWith("97913");
+    const isSpanishISBN =
+      foundISBN.startsWith("97884") || foundISBN.startsWith("97913");
     if (!isSpanishISBN) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: "Invalid ISBN",
-        message: "The ISBN does not correspond to a Spanish edition" 
+        message: "The ISBN does not correspond to a Spanish edition",
       });
     }
 
     // Verify language
     const language = volumeInfo.language;
     if (language !== "es" && language !== "ca") {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: "Invalid language",
-        message: `The book is in language '${language}', only Spanish or Catalan books are allowed` 
+        message: `The book is in language '${language}', only Spanish or Catalan books are allowed`,
       });
     }
 
     // Verify if book already exists in user's wishlist
     const existingBook = await Book.findOne({
       owner: userId,
-      title: volumeInfo.title
+      title: volumeInfo.title,
     });
 
     if (existingBook) {
@@ -474,19 +466,20 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     }
 
     // 1. Create or find author (take only the first one if there are multiple)
-    const authorName = volumeInfo.authors && volumeInfo.authors.length > 0 
-      ? volumeInfo.authors[0] 
-      : "Unknown Author";
+    const authorName =
+      volumeInfo.authors && volumeInfo.authors.length > 0
+        ? volumeInfo.authors[0]
+        : "Unknown Author";
 
-    let author = await Author.findOne({ 
+    let author = await Author.findOne({
       name: authorName,
-      owner: userId 
+      owner: userId,
     });
-    
+
     if (!author) {
-      author = new Author({ 
+      author = new Author({
         name: authorName,
-        owner: userId
+        owner: userId,
       });
       await author.save();
     }
@@ -496,19 +489,19 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     const genreIds = [];
 
     for (const genreName of genreNames) {
-      let genre = await Genre.findOne({ 
+      let genre = await Genre.findOne({
         name: genreName,
-        owner: userId 
+        owner: userId,
       });
-      
+
       if (!genre) {
-        genre = new Genre({ 
+        genre = new Genre({
           name: genreName,
-          owner: userId
+          owner: userId,
         });
         await genre.save();
       }
-      
+
       genreIds.push(genre._id);
     }
 
@@ -524,15 +517,16 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     const bookData = {
       title: volumeInfo.title || "",
       author: author._id.toString(),
-      genre: genreIds.map(id => id.toString()),
-      imageUrl: volumeInfo.imageLinks?.thumbnail || 
-                volumeInfo.imageLinks?.smallThumbnail || 
-                "",
+      genre: genreIds.map((id) => id.toString()),
+      imageUrl:
+        volumeInfo.imageLinks?.thumbnail ||
+        volumeInfo.imageLinks?.smallThumbnail ||
+        "",
       description: volumeInfo.description || "",
       price: price || undefined,
       isBought: false, // By default goes to wishlist
       isFavorite: false,
-      owner: userId.toString()
+      owner: userId.toString(),
     };
 
     // 5. Validate with Book schema
@@ -547,25 +541,24 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
 
     res.status(201).json({
       message: "Book added to wishlist successfully",
-      book: newBook
+      book: newBook,
     });
-
   } catch (error) {
     // Zod validation error
     if (error.name === "ZodError") {
       const firstError = error.errors[0];
-      
-      return res.status(400).json({ 
+
+      return res.status(400).json({
         error: "Validation error",
         message: firstError.message,
         field: firstError.path.join("."),
-        details: error.errors.map(err => ({
+        details: error.errors.map((err) => ({
           field: err.path.join("."),
-          message: err.message
-        }))
+          message: err.message,
+        })),
       });
     }
-    
+
     console.error("Error in POST /:isbn13/add-to-wishlist:", error);
     next(error);
   }
