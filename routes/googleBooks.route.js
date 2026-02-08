@@ -241,138 +241,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.get("/:isbn13", async (req, res, next) => {
-  try {
-    // Validate ISBN13 parameter
-    const validatedParams = GoogleBookISBNParamsSchema.parse(req.params);
-    const { isbn13 } = validatedParams;
-
-    // Clean ISBN for search (without hyphens)
-    const cleanISBN = isbn13.replace(/-/g, "");
-
-    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-    const params = new URLSearchParams({
-      q: `isbn:${cleanISBN}`,
-      ...(apiKey && { key: apiKey }),
-    });
-
-    // Search Google Books by ISBN
-    const url = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
-
-    const response = await fetchWithRetry(url);
-
-    if (!response.ok) {
-      return res.status(502).json({
-        error: "External server error",
-        message: "Could not get data from Google Books API",
-      });
-    }
-
-    const data = await response.json();
-
-    // Verify if book was found
-    if (!data.items || data.items.length === 0) {
-      return res.status(404).json({
-        error: "Book not found",
-        message: `No book found with ISBN ${isbn13}`,
-      });
-    }
-
-    const volumeInfo = data.items[0].volumeInfo;
-    const saleInfo = data.items[0].saleInfo;
-
-    // Verify it has ISBN-13
-    if (!volumeInfo.industryIdentifiers) {
-      return res.status(404).json({
-        error: "Incomplete data",
-        message: "The book found does not have a registered ISBN",
-      });
-    }
-
-    const isbnObj = volumeInfo.industryIdentifiers.find(
-      (id) => id.type === "ISBN_13",
-    );
-
-    if (!isbnObj) {
-      return res.status(404).json({
-        error: "ISBN not found",
-        message: "The book does not have ISBN-13 registered",
-      });
-    }
-
-    // Verify ISBN matches (without hyphens)
-    const foundISBN = isbnObj.identifier.replace(/-/g, "");
-    if (foundISBN !== cleanISBN) {
-      return res.status(404).json({
-        error: "ISBN does not match",
-        message: `The book found has a different ISBN: ${isbnObj.identifier}`,
-      });
-    }
-
-    // Verify it's from Spain (978-84 or 979-13)
-    const isSpanishISBN =
-      foundISBN.startsWith("97884") || foundISBN.startsWith("97913");
-    if (!isSpanishISBN) {
-      return res.status(404).json({
-        error: "Invalid ISBN",
-        message: "The ISBN does not correspond to a Spanish edition",
-      });
-    }
-
-    // Verify language (must be Spanish or Catalan)
-    const language = volumeInfo.language;
-    if (language !== "es" && language !== "ca") {
-      return res.status(404).json({
-        error: "Invalid language",
-        message: `The book is in language '${language}', only Spanish or Catalan books are allowed`,
-      });
-    }
-
-    // Extract price
-    let price = null;
-    if (saleInfo?.listPrice?.amount) {
-      price = saleInfo.listPrice.amount;
-    } else if (saleInfo?.retailPrice?.amount) {
-      price = saleInfo.retailPrice.amount;
-    }
-
-    // Build object according to schema
-    const bookData = {
-      isbn13: isbnObj.identifier,
-      title: volumeInfo.title || "",
-      authors: volumeInfo.authors || [],
-      imageUrl:
-        volumeInfo.imageLinks?.thumbnail ||
-        volumeInfo.imageLinks?.smallThumbnail ||
-        null,
-      categories: volumeInfo.categories || [],
-      description: volumeInfo.description || null,
-      price: price,
-      language: language,
-    };
-
-    // Validate with Zod
-    const book = GoogleBookSchema.parse(bookData);
-
-    res.json(book);
-  } catch (error) {
-    // Zod validation error
-    if (error.name === "ZodError") {
-      const firstError = error.errors[0];
-
-      return res.status(400).json({
-        error: "Validation error",
-        message: firstError.message,
-        field: firstError.path.join("."),
-        details: error.errors,
-      });
-    }
-
-    console.error("Error in GET /:isbn13:", error);
-    next(error);
-  }
-});
-
 router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
   try {
     // Validate ISBN13 parameter
@@ -382,80 +250,24 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     // Get authenticated user ID
     const userId = req.payload._id;
 
-    // Clean ISBN for search
-    const cleanISBN = isbn13.replace(/-/g, "");
+    // Validate book data from request body with GoogleBookSchema
+    const bookFromRequest = GoogleBookSchema.parse(req.body);
 
-    const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-    const params = new URLSearchParams({
-      q: `isbn:${cleanISBN}`,
-      ...(apiKey && { key: apiKey }),
-    });
-
-    // Search book in Google Books
-    const url = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
-    const response = await fetchWithRetry(url);
-
-    if (!response.ok) {
-      return res.status(502).json({
-        error: "External server error",
-        message: "Could not get data from Google Books API",
-      });
-    }
-
-    const data = await response.json();
-
-    if (!data.items || data.items.length === 0) {
-      return res.status(404).json({
-        error: "Book not found",
-        message: `No book found with ISBN ${isbn13}`,
-      });
-    }
-
-    const volumeInfo = data.items[0].volumeInfo;
-    const saleInfo = data.items[0].saleInfo;
-
-    // Validate it has necessary data
-    if (!volumeInfo.industryIdentifiers) {
-      return res.status(404).json({
-        error: "Incomplete data",
-        message: "The book does not have a registered ISBN",
-      });
-    }
-
-    const isbnObj = volumeInfo.industryIdentifiers.find(
-      (id) => id.type === "ISBN_13",
-    );
-    if (!isbnObj) {
-      return res.status(404).json({
-        error: "ISBN not found",
-        message: "The book does not have ISBN-13 registered",
-      });
-    }
-
-    // Verify it's a Spanish ISBN
-    const foundISBN = isbnObj.identifier.replace(/-/g, "");
-    const isSpanishISBN =
-      foundISBN.startsWith("97884") || foundISBN.startsWith("97913");
-    if (!isSpanishISBN) {
-      return res.status(404).json({
-        error: "Invalid ISBN",
-        message: "The ISBN does not correspond to a Spanish edition",
-      });
-    }
-
-    // Verify language
-    const language = volumeInfo.language;
-    if (language !== "es" && language !== "ca") {
-      return res.status(404).json({
-        error: "Invalid language",
-        message: `The book is in language '${language}', only Spanish or Catalan books are allowed`,
+    // Verify ISBN matches between URL and body
+    const cleanISBNFromURL = isbn13.replace(/-/g, "");
+    const cleanISBNFromBody = bookFromRequest.isbn13.replace(/-/g, "");
+    
+    if (cleanISBNFromURL !== cleanISBNFromBody) {
+      return res.status(400).json({
+        error: "ISBN mismatch",
+        message: "ISBN in URL does not match ISBN in request body",
       });
     }
 
     // Verify if book already exists in user's wishlist
     const existingBook = await Book.findOne({
       owner: userId,
-      title: volumeInfo.title,
+      title: bookFromRequest.title,
     });
 
     if (existingBook) {
@@ -467,8 +279,8 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
 
     // 1. Create or find author (take only the first one if there are multiple)
     const authorName =
-      volumeInfo.authors && volumeInfo.authors.length > 0
-        ? volumeInfo.authors[0]
+      bookFromRequest.authors && bookFromRequest.authors.length > 0
+        ? bookFromRequest.authors[0]
         : "Unknown Author";
 
     let author = await Author.findOne({
@@ -485,7 +297,7 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
     }
 
     // 2. Create or find genres
-    const genreNames = volumeInfo.categories || ["Uncategorized"];
+    const genreNames = bookFromRequest.categories || ["Uncategorized"];
     const genreIds = [];
 
     for (const genreName of genreNames) {
@@ -505,38 +317,27 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
       genreIds.push(genre._id);
     }
 
-    // 3. Extract price
-    let price = null;
-    if (saleInfo?.listPrice?.amount) {
-      price = saleInfo.listPrice.amount;
-    } else if (saleInfo?.retailPrice?.amount) {
-      price = saleInfo.retailPrice.amount;
-    }
-
-    // 4. Prepare book data
+    // 3. Prepare book data
     const bookData = {
-      title: volumeInfo.title || "",
+      title: bookFromRequest.title,
       author: author._id.toString(),
       genre: genreIds.map((id) => id.toString()),
-      imageUrl:
-        volumeInfo.imageLinks?.thumbnail ||
-        volumeInfo.imageLinks?.smallThumbnail ||
-        "",
-      description: volumeInfo.description || "",
-      price: price || undefined,
+      imageUrl: bookFromRequest.imageUrl || "",
+      description: bookFromRequest.description || "",
+      price: bookFromRequest.price || undefined,
       isBought: false, // By default goes to wishlist
       isFavorite: false,
       owner: userId.toString(),
     };
 
-    // 5. Validate with Book schema
+    // 4. Validate with Book schema
     const validatedBook = bookSchema.parse(bookData);
 
-    // 6. Create book in database
+    // 5. Create book in database
     const newBook = new Book(validatedBook);
     await newBook.save();
 
-    // 7. Populate data before returning response
+    // 6. Populate data before returning response
     await newBook.populate("author genre");
 
     res.status(201).json({
