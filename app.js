@@ -2,7 +2,7 @@
 require("dotenv").config();
 
 // ℹ️ Connects to the database
-require("./db");
+const { connectDB } = require("./db");
 
 // Express
 const express = require("express");
@@ -24,6 +24,20 @@ app.use(express.json()); // para poder recibir JSON en el body
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
   next();
+});
+
+// Middleware to ensure DB connection before processing requests
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    res.status(503).json({ 
+      error: 'Service temporarily unavailable', 
+      message: 'Database connection failed' 
+    });
+  }
 });
 
 // Middleware global o configuración extra

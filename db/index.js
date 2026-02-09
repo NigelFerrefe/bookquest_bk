@@ -8,6 +8,10 @@ const mongoose = require("mongoose");
 const MONGO_URI =
   process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/bookquest_bk";
 
+// Disable buffering for serverless environments
+mongoose.set('bufferCommands', false);
+mongoose.set('bufferTimeoutMS', 30000);
+
 // Optimized settings for serverless environments (Vercel)
 const mongoOptions = {
   serverSelectionTimeoutMS: 30000, // 30 seconds to select server
@@ -19,25 +23,44 @@ const mongoOptions = {
   retryReads: true, // Retry failed reads automatically
 };
 
-mongoose
-  .connect(MONGO_URI, mongoOptions)
-  .then((x) => {
-    const dbName = x.connections[0].name;
+// Connection cache for serverless
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected && mongoose.connection.readyState === 1) {
+    console.log('Using existing MongoDB connection');
+    return;
+  }
+
+  try {
+    const db = await mongoose.connect(MONGO_URI, mongoOptions);
+    isConnected = db.connections[0].readyState === 1;
+    const dbName = db.connections[0].name;
     console.log(`Connected to Mongo! Database name: "${dbName}"`);
-  })
-  .catch((err) => {
+  } catch (err) {
     console.error("Error connecting to mongo: ", err);
-  });
+    isConnected = false;
+    throw err;
+  }
+};
 
 // Handle connection events for better debugging
 mongoose.connection.on('disconnected', () => {
-  console.warn('MongoDB disconnected. Attempting to reconnect...');
+  console.warn('MongoDB disconnected');
+  isConnected = false;
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('MongoDB reconnected successfully');
+  isConnected = true;
 });
 
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
+  isConnected = false;
 });
+
+// Initialize connection
+connectDB();
+
+module.exports = { connectDB };
