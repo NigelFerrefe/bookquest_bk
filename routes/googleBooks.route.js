@@ -3,6 +3,7 @@ const router = express.Router();
 const Book = require("../models/books.model");
 const Author = require("../models/author.model");
 const Genre = require("../models/genre.model");
+const { uploadImageToCloudinary } = require("../utils/imageUpload");
 const {
   GoogleBookSchema,
   GoogleBookSearchParamsSchema,
@@ -317,12 +318,18 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
       genreIds.push(genre._id);
     }
 
-    // 3. Prepare book data
+    // 3. Upload image to Cloudinary
+    let cloudinaryImageUrl = null;
+    if (bookFromRequest.imageUrl) {
+      cloudinaryImageUrl = await uploadImageToCloudinary(bookFromRequest.imageUrl);
+    }
+
+    // 4. Prepare book data
     const bookData = {
       title: bookFromRequest.title,
       author: author._id.toString(),
       genre: genreIds.map((id) => id.toString()),
-      imageUrl: bookFromRequest.imageUrl || "",
+      imageUrl: cloudinaryImageUrl || "",
       description: bookFromRequest.description || "",
       price: bookFromRequest.price || undefined,
       isBought: false, // By default goes to wishlist
@@ -330,14 +337,14 @@ router.post("/:isbn13/add-to-wishlist", async (req, res, next) => {
       owner: userId.toString(),
     };
 
-    // 4. Validate with Book schema
+    // 5. Validate with Book schema
     const validatedBook = bookSchema.parse(bookData);
 
-    // 5. Create book in database
+    // 6. Create book in database
     const newBook = new Book(validatedBook);
     await newBook.save();
 
-    // 6. Populate data before returning response
+    // 7. Populate data before returning response
     await newBook.populate("author genre");
 
     res.status(201).json({
