@@ -3,64 +3,66 @@
 const mongoose = require("mongoose");
 
 // ℹ️ Sets the MongoDB URI for our app to have access to it.
-// If no env has been set, we dynamically set it to whatever the folder name was upon the creation of the app
-
 const MONGO_URI =
   process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/bookquest_bk";
 
-// Disable buffering for serverless environments
-mongoose.set('bufferCommands', false);
-mongoose.set('bufferTimeoutMS', 30000);
-
-// Optimized settings for serverless environments (Vercel)
-const mongoOptions = {
-  serverSelectionTimeoutMS: 30000, // 30 seconds to select server
-  socketTimeoutMS: 45000, // 45 seconds for socket operations
-  connectTimeoutMS: 30000, // 30 seconds for initial connection
-  maxPoolSize: 10, // Maximum connections in pool
-  minPoolSize: 1, // Minimum connections to maintain
-  retryWrites: true, // Retry failed writes automatically
-  retryReads: true, // Retry failed reads automatically
-};
+// Disable buffering immediately - CRITICAL for serverless
+mongoose.set('strictQuery', false);
 
 // Connection cache for serverless
-let isConnected = false;
+let cachedConnection = null;
 
 const connectDB = async () => {
-  if (isConnected && mongoose.connection.readyState === 1) {
-    console.log('Using existing MongoDB connection');
-    return;
+  // If we have a cached connection and it's ready, use it
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    console.log('✅ Using cached MongoDB connection');
+    return cachedConnection;
+  }
+
+  // If mongoose is connecting, wait for it
+  if (mongoose.connection.readyState === 2) {
+    console.log('⏳ Waiting for MongoDB connection to establish...');
+    await new Promise((resolve) => {
+      mongoose.connection.once('connected', resolve);
+    });
+    return mongoose.connection;
   }
 
   try {
-    const db = await mongoose.connect(MONGO_URI, mongoOptions);
-    isConnected = db.connections[0].readyState === 1;
-    const dbName = db.connections[0].name;
-    console.log(`Connected to Mongo! Database name: "${dbName}"`);
+    console.log('🔄 Establishing new MongoDB connection...');
+    
+    // Optimized settings for serverless environments
+    const connection = await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
+      maxPoolSize: 1, // Reduced for serverless
+      minPoolSize: 1,
+      retryWrites: true,
+      retryReads: true,
+      bufferCommands: false, // CRITICAL: Disable buffering
+    });
+
+    cachedConnection = connection;
+    console.log(`✅ Connected to MongoDB: "${connection.connections[0].name}"`);
+    
+    return connection;
   } catch (err) {
-    console.error("Error connecting to mongo: ", err);
-    isConnected = false;
-    throw err;
+    console.error('❌ MongoDB connection error:', err.message);
+    cachedConnection = null;
+    throw new Error(`Database connection failed: ${err.message}`);
   }
 };
 
-// Handle connection events for better debugging
+// Handle connection events
 mongoose.connection.on('disconnected', () => {
-  console.warn('MongoDB disconnected');
-  isConnected = false;
-});
-
-mongoose.connection.on('reconnected', () => {
-  console.log('MongoDB reconnected successfully');
-  isConnected = true;
+  console.warn('⚠️ MongoDB disconnected');
+  cachedConnection = null;
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err);
-  isConnected = false;
+  console.error('❌ MongoDB error:', err.message);
+  cachedConnection = null;
 });
-
-// Initialize connection
-connectDB();
 
 module.exports = { connectDB };

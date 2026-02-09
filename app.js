@@ -32,10 +32,11 @@ app.use(async (req, res, next) => {
     await connectDB();
     next();
   } catch (error) {
-    console.error('Database connection failed:', error);
+    console.error('❌ Database connection failed in middleware:', error.message);
     res.status(503).json({ 
       error: 'Service temporarily unavailable', 
-      message: 'Database connection failed' 
+      message: 'Unable to establish database connection',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
